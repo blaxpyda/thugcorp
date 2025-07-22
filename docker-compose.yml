@@ -1,0 +1,74 @@
+# Docker Compose for ThugCorp Next.js Application
+
+services:
+  # Main Next.js application
+  thugcorp-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: thugcorp-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      # Mount public directory for static assets (optional)
+      - ./public:/app/public:ro
+    networks:
+      - thugcorp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development service (alternative to production)
+  thugcorp-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: thugcorp-dev
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      # Mount source code for hot reloading
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - thugcorp-network
+    profiles:
+      - dev
+
+  # Nginx reverse proxy (optional, for production scaling)
+  nginx:
+    image: nginx:alpine
+    container_name: thugcorp-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - thugcorp-app
+    networks:
+      - thugcorp-network
+    profiles:
+      - nginx
+
+networks:
+  thugcorp-network:
+    driver: bridge
+
+# Optional: Add volumes for persistent data if needed in the future
+volumes:
+  app_data:
+    driver: local
